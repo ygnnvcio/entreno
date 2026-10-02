@@ -163,6 +163,14 @@ nav button.on svg{stroke-width:2.4}
 .punto.solo{border:2px solid var(--solo);color:var(--solo)}
 .punto.ign.si{background:var(--ign);color:var(--ign-ink)}
 .punto.solo.si{background:var(--solo);color:var(--solo-ink);border-color:var(--solo)}
+details.plan{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+details.plan summary{font-weight:700;cursor:pointer;padding:4px 0}
+.plan-l{margin:8px 0 0;padding-left:18px;line-height:1.45}
+.plan-l li{margin-bottom:6px}
+.plan-t div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
+.plan-t div:first-child{border-top:0}
+.plan-t small{color:var(--mut)}
+.plan-t div>b{white-space:nowrap}
 .etq{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:1px}
 </style>
 </head>
@@ -236,7 +244,7 @@ function render(h) {
     pill.textContent = 'Día ' + h.proximo.n + ': ' + DIAS_N[h.proximo.dia].toLowerCase() + ' ' + fc(h.proximo.fecha);
   } else pill.classList.add('hide');
   avance(h);
-  $('#v-hoy').innerHTML = semanaHtml(h) + (entrena ? sesionHtml(h) : '') + suenoHtml(h) + comidasHtml(h);
+  $('#v-hoy').innerHTML = semanaHtml(h) + (entrena ? sesionHtml(h) : '') + suenoHtml(h) + comidasHtml(h) + planComidaHtml(h);
   enlazar();
   renderAvance(h);
 }
@@ -322,6 +330,48 @@ function comidasHtml(h) {
     '<div class="fila"><input type="text" id="c-que" placeholder="Opcional: qué comiste"></div>' +
     '<button id="b-comida">Guardar comida</button></div></div>';
   return out;
+}
+
+// Guía de comida (ficha de Dante, sección 6 y 7). Gramos de proteína: USDA FoodData Central.
+var PROTEINA = [['Pechuga de pollo cocida', '4 oz', 35], ['Carne molida 90% cocida', '4 oz', 32], ['Atún light en agua, escurrido', '1 lata (4 oz)', 29],
+  ['Queso cottage', '1 taza', 24], ['Yogur griego natural', '1 taza', 23], ['Huevos', '3', 19], ['Lentejas cocidas', '1 taza', 18],
+  ['Frijoles negros cocidos', '1 taza', 15], ['Leche', '1 taza', 8], ['Avena', '½ taza seca', 5]];
+var EJEMPLO = {
+  semana: [['Desayuno', '3 huevos + ½ taza de avena con 1 taza de leche + fruta + semillas', 33], ['Almuerzo', '4 oz de pollo + arroz + verduras', 35],
+    ['Merienda', '1 taza de yogur griego + fruta', 23], ['Cena', '4 oz de carne molida + ½ taza de frijoles + ensalada', 40]],
+  finde: [['Primera comida', '4 huevos + 1 taza de yogur griego + fruta + semillas', 48], ['Segunda comida', '5 oz de pollo + papa + verduras', 44],
+    ['Última comida', '4 oz de carne molida + 1 taza de lentejas + verduras', 50]]
+};
+function planComidaHtml(h) {
+  var finde = h.dia === 'sab' || h.dia === 'dom', ej = EJEMPLO[finde ? 'finde' : 'semana'];
+  var total = ej.reduce(function (a, x) { return a + x[2]; }, 0);
+  var lista = function (xs) { return '<ul class="plan-l">' + xs.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>'; };
+  return '<div class="card"><div class="sub">Tu plan de comida</div><h2>' + h.proteina + ' g de proteína hoy</h2>' +
+    '<div class="sub">' + h.comidasMeta + ' comidas de unos ' + h.proteinaPorComida + ' g de proteína cada una.</div>' +
+    (h.ventana ? '<div class="aviso" style="margin-top:10px">' + esc(h.ventana.texto) + '. Entrena después de tu primera comida, nunca en ayunas.</div>' : '') +
+    '<details class="plan"><summary>Cómo armar cada plato</summary>' + lista([
+      '<b>Proteína</b>: unos ' + h.proteinaPorComida + ' g (mira la tabla de abajo). 4 oz de carne cocida es más o menos la palma de tu mano.',
+      '<b>Carbohidrato</b>: arroz, papa, avena, frijoles, lentejas o fruta. En el desayuno, el almuerzo y la comida después de entrenar.',
+      '<b>Verduras</b>: todas las que quieras.',
+      h.diaN > 0 ? 'Hoy entrenas: después del entreno come también carbohidrato, aunque sea de noche.' : 'Hoy no entrenas: en la cena, carbohidrato en porción chica.'
+    ]) + '</details>' +
+    '<details class="plan"><summary>Cuánta proteína tiene cada cosa</summary><div class="plan-t">' + PROTEINA.map(function (p) {
+      return '<div><span>' + p[0] + ' <small>' + p[1] + '</small></span><b>' + p[2] + ' g</b></div>';
+    }).join('') + '</div><div class="sub" style="margin-top:6px">Fuente: USDA FoodData Central.</div></details>' +
+    '<details class="plan"><summary>Sí y no</summary>' + lista([
+      '<b>Sí</b>: carnes, pollo, pescado, huevos, yogur griego natural, leche, arroz, papa, avena, frijoles, lentejas, fruta entera, verduras.',
+      '<b>No</b>: pan, tortillas de harina, pasta, galletas, cereal de caja, dulces, jugos y bebidas con azúcar.',
+      'En la etiqueta, "Added sugars": máximo 10 g por comida. El azúcar de la fruta no cuenta.'
+    ]) + '</details>' +
+    '<details class="plan"><summary>Todos los días y cada semana</summary>' + lista([
+      '<b>Todos los días</b>: 1 cucharada de chía, 1 de linaza <b>molida</b> y 1 de semillas de calabaza. Empieza con media de cada una. Y huevos.',
+      '<b>Atún</b>: light (skipjack) 2 o 3 veces por semana, 4 oz. Albacora máximo 1 vez. Nunca bigeye.',
+      '<b>Comida libre</b>: 1 por semana, dentro de tu horario. Cuenta como cumplida y no se compensa al día siguiente.',
+      'Si te da mucha hambre fuera de tu horario o te saltas comidas, díselo a Ignacio.'
+    ]) + '</details>' +
+    '<details class="plan"><summary>Ejemplo de un día ' + (finde ? 'de fin de semana' : 'entre semana') + ' (' + total + ' g)</summary><div class="plan-t">' + ej.map(function (x) {
+      return '<div><span><b>' + x[0] + '</b><br><small>' + x[1] + '</small></span><b>' + x[2] + ' g</b></div>';
+    }).join('') + '</div></details></div>';
 }
 
 // Guardado instantáneo: se muestra al tiro y se sube por detrás. Si falla, se quita y avisa.
