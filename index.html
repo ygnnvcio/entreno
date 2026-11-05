@@ -139,6 +139,7 @@ nav button.on svg{stroke-width:2.4}
 @media (prefers-color-scheme:dark){:root{--solo:#f2c14e;--solo-ink:#2a1e04;--solo2:#2f2610}}
 .hero h1{font-size:44px}
 .anillo b{font-size:24px}
+.anillo span{white-space:nowrap;left:-30px;right:-30px}
 .pill.ign{background:#fff;color:var(--hero2);border-color:#fff}
 .pill.solo{background:var(--solo);color:var(--solo-ink);border-color:var(--solo)}
 .b-ign{background:var(--ign);color:var(--ign-ink)}
@@ -188,6 +189,8 @@ details.plan summary{font-weight:700;cursor:pointer;padding:4px 0}
 .guia .reloj{font:700 96px/1 "Barlow Condensed",sans-serif;text-align:center;margin:30px 0 6px;font-variant-numeric:tabular-nums}
 .guia .dos{display:flex;gap:8px}
 .guia .dos button{flex:1}
+a.vid{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:7px 12px;border-radius:10px;background:var(--acc2);color:var(--acc);font-size:13.5px;font-weight:700;text-decoration:none}
+a.vid::before{content:"";width:0;height:0;border-left:8px solid currentColor;border-top:5px solid transparent;border-bottom:5px solid transparent}
 </style>
 </head>
 <body>
@@ -252,8 +255,9 @@ function render(h) {
   H = h;
   try { localStorage.setItem('entreno.h', JSON.stringify(h)); } catch (e) { /* sin caché: carga normal */ }
   $('#fecha').textContent = DIAS_N[h.dia] + ' ' + fc(h.fecha);
-  var entrena = h.diaN > 0;
-  $('#titulo').textContent = entrena ? 'Día ' + h.diaN : 'Hoy descansas';
+  // Día N = sesión con Ignacio; lo de casa es extra y no lleva número.
+  var entrena = tieneEntreno(h);
+  $('#titulo').textContent = h.diaN > 0 ? 'Día ' + h.diaN : entrena ? 'En casa' : 'Hoy descansas';
   var pill = $('#pill');
   pill.className = 'pill';
   if (entrena) {
@@ -268,17 +272,18 @@ function render(h) {
   renderAvance(h);
 }
 
+function tieneEntreno(h) { return !!(h.sesion && h.sesion.items && h.sesion.items.length && !h.sesion.descanso); }
 function avance(h) {
   var total = h.entrenos.length, p = total ? h.hechos / total : 0;
   $('#pct').textContent = h.hechos;
-  $('#pct-de').textContent = 'de ' + total;
+  $('#pct-de').textContent = 'de ' + total + ' con Ignacio';
   $('#arco').style.strokeDashoffset = 201 - 201 * p;
 }
 
 // Los 3 toques del día (decisión de Ignacio, 2026-11-05): sueño, entreno si toca y al menos una foto de comida.
 function toquesHtml(h) {
   var xs = [['sueno', 'Horas de sueño', !!ultimo('habitos')]];
-  if (h.diaN > 0) xs.push(['entreno', 'Tu entreno', !!ultimo('entreno')]);
+  if (tieneEntreno(h)) xs.push(['entreno', 'Tu entreno', !!ultimo('entreno')]);
   xs.push(['comidas', 'Una foto de comida', h.registros.some(function (r) { return r.tipo === 'comida'; })]);
   var n = xs.filter(function (x) { return x[2]; }).length;
   return '<div class="card" id="card-toques"><div class="card-top"><div><div class="sub">Lo de hoy</div><h2>' +
@@ -315,7 +320,8 @@ function sesionHtml(h) {
     out += '<div class="ej' + (p.hecho ? ' hecho' : '') + '" data-i="' + i + '"><div class="num">' + (i + 1) + '</div><div class="n">' + esc(e.ejercicio) + '</div>' +
       '<div><span class="chip">' + esc(e.series) + ' × ' + esc(e.reps) + '</span>' + (e.peso ? '<span class="chip peso">' + esc(e.peso) + ' lb</span>' : '') + '</div>' +
       (e.clave ? '<div class="clave">' + esc(e.clave) + '</div>' : '') +
-      (e.notaPeso ? '<div class="clave">' + esc(e.notaPeso) + '</div>' : '');
+      (e.notaPeso ? '<div class="clave">' + esc(e.notaPeso) + '</div>' : '') +
+      (e.video ? '<div><a class="vid" href="' + esc(e.video) + '" target="_blank" rel="noopener">Ver cómo se hace</a></div>' : '');
     if (e.tipo === 'fuerza') {
       out += '<div class="fila"><input class="corto" type="number" inputmode="decimal" placeholder="lb" data-k="peso" value="' + esc(p.peso || '') + '">' +
         '<input style="flex:1;width:auto" type="text" inputmode="numeric" placeholder="reps por serie: 8 8 7" data-k="reps" value="' + esc(p.reps || '') + '"></div>';
@@ -388,7 +394,7 @@ function planComidaHtml(h) {
       '<b>Proteína</b>: unos ' + h.proteinaPorComida + ' g (mira la tabla de abajo). 4 oz de carne cocida es más o menos la palma de tu mano.',
       '<b>Carbohidrato</b>: arroz, papa, avena, frijoles, lentejas o fruta. En el desayuno, el almuerzo y la comida después de entrenar.',
       '<b>Verduras</b>: todas las que quieras.',
-      h.diaN > 0 ? 'Hoy entrenas: después del entreno come también carbohidrato, aunque sea de noche.' : 'Hoy no entrenas: en la cena, carbohidrato en porción chica.'
+      tieneEntreno(h) ? 'Hoy entrenas: después del entreno come también carbohidrato, aunque sea de noche.' : 'Hoy no entrenas: en la cena, carbohidrato en porción chica.'
     ]) + '</details>' +
     '<details class="plan"><summary>Cuánta proteína tiene cada cosa</summary><div class="plan-t">' + PROTEINA.map(function (p) {
       return '<div><span>' + p[0] + ' <small>' + p[1] + '</small></span><b>' + p[2] + ' g</b></div>';
@@ -561,6 +567,7 @@ function pintarGuia() {
     var x = items[G.i], res = G.res[G.i], ns = seriesDe(x), fuerza = x.tipo === 'fuerza';
     el.innerHTML = arriba + '<h1>' + esc(x.ejercicio) + '</h1>' + (x.clave ? '<div class="sub">' + esc(x.clave) + '</div>' : '') +
       (x.notaPeso ? '<div class="sub">' + esc(x.notaPeso) + '</div>' : '') +
+      (x.video ? '<a class="vid" href="' + esc(x.video) + '" target="_blank" rel="noopener">Ver cómo se hace</a>' : '') +
       '<div class="grande">Serie ' + (G.s + 1) + '<span class="sub" style="font-size:28px"> de ' + ns + '</span></div>' +
       '<div class="objetivo">' + esc(x.reps) + (/\d$/.test(String(x.reps)) ? ' reps' : '') + (x.peso ? ' · ' + esc(x.peso) + ' lb' : '') + '</div>' +
       (fuerza ? '<div class="fila"><input type="number" inputmode="decimal" id="g-peso" placeholder="lb" value="' + esc(res.peso) + '">' +
@@ -637,9 +644,10 @@ function foto(input, listo) {
 // ---------------------------------------------------------------- Mi avance
 function renderAvance(h) {
   var total = h.entrenos.length;
-  var out = '<div class="card"><div class="sub">12 semanas</div><h2>' + h.hechos + ' de ' + total + ' entrenos</h2>' +
+  var out = '<div class="card"><div class="sub">Sesiones con Ignacio</div><h2>' + h.hechos + ' de ' + total + ' sesiones</h2>' +
+    '<div class="sub" style="margin-top:4px">Lo que haces en casa no se cuenta aquí: es extra para que llegues mejor a cada sesión.</div>' +
     '<div class="barra"><i style="width:' + (total ? Math.round(h.hechos / total * 100) : 0) + '%"></i></div>' +
-    '<div class="leyenda"><span><i class="b-ign"></i>Con Ignacio</span><span><i class="b-solo"></i>Solo</span></div></div><div class="card">';
+    '</div><div class="card">';
   h.entrenos.forEach(function (e) {
     var esHoy = e.fecha === h.fecha, futuro = e.fecha > h.fecha;
     var estado = e.hecho ? 'Hecho' : esHoy ? 'Hoy' : futuro ? '' : 'Sin registrar';
