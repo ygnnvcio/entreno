@@ -172,6 +172,22 @@ details.plan summary{font-weight:700;cursor:pointer;padding:4px 0}
 .plan-t small{color:var(--mut)}
 .plan-t div>b{white-space:nowrap}
 .etq{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:1px}
+.toque{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-top:1px solid var(--line);cursor:pointer}
+.toque:first-of-type{border-top:0}
+.toque b{font-weight:600}
+.toque span{font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--card2);color:var(--mut);border:1px solid var(--line)}
+.toque.si span{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.guia{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}
+.guia .arriba{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.guia .arriba button{width:auto;margin:0;padding:8px 14px;font-size:13.5px;background:var(--card2);color:var(--ink);border:1px solid var(--line)}
+.guia h1{font:700 34px/1.05 "Barlow Condensed",sans-serif;margin:16px 0 6px}
+.guia .grande{font:700 64px/1 "Barlow Condensed",sans-serif;text-align:center;margin:18px 0 4px}
+.guia .objetivo{text-align:center;color:var(--mut);font-size:15px}
+.guia .fila{display:flex;gap:8px;margin-top:14px}
+.guia .fila input{flex:1;font-size:20px;padding:14px;text-align:center}
+.guia .reloj{font:700 96px/1 "Barlow Condensed",sans-serif;text-align:center;margin:30px 0 6px;font-variant-numeric:tabular-nums}
+.guia .dos{display:flex;gap:8px}
+.guia .dos button{flex:1}
 </style>
 </head>
 <body>
@@ -224,7 +240,10 @@ function pedir(url, opts) {
 }
 function cargar() { return pedir(API + '?api=hoy&k=' + encodeURIComponent(K)); }
 // Texto plano: la petición no necesita permiso previo del navegador (CORS simple).
+// Página de prueba (prueba.html): lee los datos reales pero no guarda nada, para que Ignacio la pruebe en su teléfono.
+var PRUEBA = /prueba/.test(location.pathname);
 function guardarApi(tipo, detalle, foto) {
+  if (PRUEBA) return Promise.resolve({ registros: H.registros.slice(), hechos: H.hechos, entrenos: H.entrenos });
   return pedir(API, { method: 'POST', body: JSON.stringify({ k: K, fn: 'guardar', args: [tipo, detalle, foto || null] }) });
 }
 
@@ -244,7 +263,7 @@ function render(h) {
     pill.textContent = 'Día ' + h.proximo.n + ': ' + DIAS_N[h.proximo.dia].toLowerCase() + ' ' + fc(h.proximo.fecha);
   } else pill.classList.add('hide');
   avance(h);
-  $('#v-hoy').innerHTML = semanaHtml(h) + (entrena ? sesionHtml(h) : '') + suenoHtml(h) + comidasHtml(h) + planComidaHtml(h);
+  $('#v-hoy').innerHTML = (PRUEBA ? '<div class="aviso">Versión de prueba: muestra los datos reales de Dante pero no guarda nada.</div>' : '') + toquesHtml(h) + semanaHtml(h) + (entrena ? sesionHtml(h) : '') + suenoHtml(h) + comidasHtml(h) + planComidaHtml(h);
   enlazar();
   renderAvance(h);
 }
@@ -254,6 +273,19 @@ function avance(h) {
   $('#pct').textContent = h.hechos;
   $('#pct-de').textContent = 'de ' + total;
   $('#arco').style.strokeDashoffset = 201 - 201 * p;
+}
+
+// Los 3 toques del día (decisión de Ignacio, 2026-11-05): sueño, entreno si toca y al menos una foto de comida.
+function toquesHtml(h) {
+  var xs = [['sueno', 'Horas de sueño', !!ultimo('habitos')]];
+  if (h.diaN > 0) xs.push(['entreno', 'Tu entreno', !!ultimo('entreno')]);
+  xs.push(['comidas', 'Una foto de comida', h.registros.some(function (r) { return r.tipo === 'comida'; })]);
+  var n = xs.filter(function (x) { return x[2]; }).length;
+  return '<div class="card" id="card-toques"><div class="card-top"><div><div class="sub">Lo de hoy</div><h2>' +
+    (n === xs.length ? 'Listo por hoy' : n + ' de ' + xs.length + ' toques') + '</h2></div></div>' +
+    xs.map(function (x) {
+      return '<div class="toque' + (x[2] ? ' si' : '') + '" data-ir="' + x[0] + '"><b>' + x[1] + '</b><span>' + (x[2] ? 'Hecho' : 'Falta') + '</span></div>';
+    }).join('') + '</div>';
 }
 
 // Próximos 7 días: verde con Ignacio, dorado solo, gris libre.
@@ -271,9 +303,12 @@ function sesionHtml(h) {
   var hechos = {};
   (pd.items || []).forEach(function (x) { hechos[x.ejercicio] = x; });
   var hechosN = (pd.items || []).filter(function (x) { return x.hecho; }).length;
-  var out = '<div class="card"><div class="card-top"><div><div class="sub">Tu entreno</div><h2>' + esc(s.titulo) + '</h2></div>' +
+  var enCurso = guiaGuardada();
+  var out = '<div class="card" id="card-entreno"><div class="card-top"><div><div class="sub">Tu entreno</div><h2>' + esc(s.titulo) + '</h2></div>' +
     '<span class="badge ' + (s.conIgnacio ? 'b-ign' : 'b-solo') + '">' + (s.conIgnacio ? 'Con Ignacio' + (s.hora ? ' · ' + esc(s.hora) : '') : 'Solo') + '</span></div>' +
-    (s.items.length > 1 ? '<div class="barra"><i style="width:' + Math.round(hechosN / s.items.length * 100) + '%"></i></div><div class="sub" style="margin-top:6px">' + hechosN + ' de ' + s.items.length + ' ejercicios</div>' : '');
+    (s.items.length > 1 ? '<div class="barra"><i style="width:' + Math.round(hechosN / s.items.length * 100) + '%"></i></div><div class="sub" style="margin-top:6px">' + hechosN + ' de ' + s.items.length + ' ejercicios</div>' : '') +
+    (s.items.length ? '<button id="b-empezar">' + (enCurso ? 'Seguir donde quedaste' : prev ? 'Repetir con la guía' : 'Empezar') + '</button>' +
+      '<div class="sub" style="margin-top:6px">' + (prev ? 'Ya está guardado. ' : '') + 'La app te lleva ejercicio por ejercicio con el descanso medido y lo anota sola al final. Si ya lo hiciste, márcalo abajo.</div>' : '');
   out += '<div style="margin-top:8px">';
   s.items.forEach(function (e, i) {
     var p = hechos[e.ejercicio] || {};
@@ -317,8 +352,8 @@ function suenoHtml(h) {
 
 function comidasHtml(h) {
   var cs = h.registros.filter(function (r) { return r.tipo === 'comida'; });
-  var out = '<div class="card" id="card-comidas"><div class="sub">Comida</div><h2>Foto de cada comida</h2>' +
-    '<div class="sub">Sin harinas ni azúcar añadida; la fruta sí. Proteína en cada comida.</div>';
+  var out = '<div class="card" id="card-comidas"><div class="sub">Comida</div><h2>' + (cs.length ? cs.length + (cs.length === 1 ? ' foto hoy' : ' fotos hoy') : 'Una foto de comida') + '</h2>' +
+    '<div class="sub">Con una al día cumples; si subes más, mejor. Sin harinas ni azúcar añadida; la fruta sí. Proteína en cada comida.</div>';
   if (cs.length) out += '<div style="margin-top:8px">' + cs.map(function (c) {
     return '<div class="comida"><b>' + esc(c.detalle.cual || 'Comida') + '</b> <span class="sub">' + hora(c) + (c.foto ? ' · con foto' : '') + '</span>' +
       (c.detalle.que ? '<div class="sub">' + esc(c.detalle.que) + '</div>' : '') + '</div>';
@@ -397,6 +432,7 @@ function pintar(tipo) {
   if (tipo === 'habitos') $('#card-sueno').outerHTML = suenoHtml(H);
   else if (tipo === 'comida') $('#card-comidas').outerHTML = comidasHtml(H);
   else { render(H); return; }
+  $('#card-toques').outerHTML = toquesHtml(H);
   enlazar();
 }
 
@@ -411,7 +447,148 @@ function aviso(t, ok) {
 
 function radio(n) { var x = document.querySelector('input[name="' + n + '"]:checked'); return x ? x.value : ''; }
 
+// ---------------------------------------------------------------- Entreno guiado
+// Para los días en que entrena sin Ignacio: un ejercicio a la vez, serie por serie, con el descanso contado.
+// El avance queda en el teléfono (si cierra la app, sigue donde quedó) y al final se guarda como un entreno normal.
+var G = null, gReloj = null, gAudio = null, gWake = null;
+function claveGuia() { return 'entreno.guia.' + (H ? H.fecha : ''); }
+function guiaGuardada() {
+  try { var g = JSON.parse(localStorage.getItem(claveGuia()) || 'null'); return g && g.n === H.sesion.items.length ? g : null; } catch (e) { return null; }
+}
+function guardarGuia() { try { localStorage.setItem(claveGuia(), JSON.stringify(G)); } catch (e) { /* sin almacenamiento: sigue en memoria */ } }
+function seriesDe(e) { var n = parseInt(e.series, 10); return n > 0 && n < 20 ? n : 1; }
+// Descanso: lo que diga la clave ("2-3 min" → 3 min); si no, 90 s en fuerza y 45 s en lo demás.
+function descansoDe(e) {
+  var m = String(e.clave || '').match(/(\d+)(?:\s*-\s*(\d+))?\s*min/i);
+  if (m) return Number(m[2] || m[1]) * 60;
+  return e.tipo === 'fuerza' ? 90 : 45;
+}
+// Reps por tiempo ("1 min", "30 s"): segundos para el reloj de trabajo; 0 si son reps normales.
+function tiempoDe(e) {
+  var m = String(e.reps || '').match(/^\s*(\d+)(?:\s*-\s*\d+)?\s*(min|s|seg)\b/i);
+  return m ? Number(m[1]) * (/^m/i.test(m[2]) ? 60 : 1) : 0;
+}
+function empezarGuia() {
+  G = guiaGuardada() || { n: H.sesion.items.length, i: 0, s: 0, fase: 'serie', fin: 0, res: H.sesion.items.map(function (e) { return { hecho: false, peso: e.peso || '', reps: [] }; }) };
+  try { gAudio = gAudio || new (window.AudioContext || window.webkitAudioContext)(); gAudio.resume(); } catch (e) { gAudio = null; }
+  try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { gWake = w; }, function () {}); } catch (e) { /* la pantalla puede apagarse */ }
+  var el = $('#guia');
+  if (!el) { el = document.createElement('div'); el.id = 'guia'; el.className = 'guia'; document.body.appendChild(el); }
+  el.classList.remove('hide');
+  document.body.style.overflow = 'hidden';
+  pintarGuia();
+}
+function cerrarGuia() {
+  clearInterval(gReloj);
+  try { if (gWake) gWake.release(); } catch (e) { /* nada */ }
+  gWake = null;
+  $('#guia').classList.add('hide');
+  document.body.style.overflow = '';
+  render(H);
+}
+function pitido() {
+  try { if (navigator.vibrate) navigator.vibrate([300, 120, 300]); } catch (e) { /* sin vibración */ }
+  if (!gAudio) return;
+  [0, 0.25, 0.5].forEach(function (t) {
+    var o = gAudio.createOscillator(), g = gAudio.createGain();
+    o.frequency.value = 880; o.connect(g); g.connect(gAudio.destination);
+    g.gain.setValueAtTime(0.25, gAudio.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, gAudio.currentTime + t + 0.2);
+    o.start(gAudio.currentTime + t); o.stop(gAudio.currentTime + t + 0.2);
+  });
+}
+function serieHecha() {
+  var x = H.sesion.items[G.i];
+  G.res[G.i].hecho = true;
+  var ultimoEj = G.i === G.n - 1 && G.s === seriesDe(x) - 1;
+  var desc = descansoDe(x);
+  siguiente();
+  if (ultimoEj) { pintarGuia(); return; }
+  G.fase = 'descanso'; G.fin = Date.now() + desc * 1000; pintarGuia();
+}
+function siguiente() {
+  var e = H.sesion.items[G.i];
+  if (G.s + 1 < seriesDe(e)) { G.s++; return; }
+  G.i++; G.s = 0;
+  if (G.i >= G.n) G.fase = 'final';
+}
+function pintarGuia() {
+  clearInterval(gReloj);
+  guardarGuia();
+  var el = $('#guia'), items = H.sesion.items;
+  var arriba = '<div class="arriba"><div class="sub">' + (G.fase === 'final' ? 'Último paso' : 'Ejercicio ' + (G.i + 1) + ' de ' + G.n) + '</div><button id="g-salir">Salir</button></div>' +
+    '<div class="barra"><i style="width:' + Math.round(Math.min(G.i, G.n) / G.n * 100) + '%"></i></div>';
+  if (G.fase === 'final') {
+    var hechos = G.res.filter(function (r) { return r.hecho; }).length;
+    el.innerHTML = arriba + '<h1>Terminaste</h1><div class="sub">' + hechos + ' de ' + G.n + ' ejercicios hechos.</div>' +
+      '<div class="card"><div class="n">¿Qué tan duro fue? (1 fácil, 10 al máximo)</div>' + escala('g-duro', 10, '') +
+      '<div class="n" style="margin-top:14px">¿Te dolió algo?</div><input type="text" id="g-dolor" placeholder="Déjalo vacío si no. Si sí: dónde y en qué ejercicio"></div>' +
+      '<button id="g-guardar">Guardar entreno</button>';
+    $('#g-guardar').onclick = function () {
+      var detalle = { fecha: H.fecha, dia: H.dia, guiado: true, duro: radio('g-duro'), dolor: $('#g-dolor').value.trim(),
+        items: items.map(function (e, i) { var r = G.res[i]; return { ejercicio: e.ejercicio, hecho: r.hecho, peso: e.tipo === 'fuerza' ? r.peso : '', reps: r.reps.join(' ') }; }) };
+      try { localStorage.removeItem(claveGuia()); } catch (x) { /* nada */ }
+      G = null;
+      cerrarGuia();
+      guardarRapido('entreno', detalle);
+      if (detalle.dolor) alert('Anotaste un dolor. No repitas ese ejercicio hasta hablar con Ignacio. Si es en el pecho, o te mareas o te falta el aire, para todo y avísale a un adulto.');
+    };
+  } else if (G.fase === 'trabajo') {
+    var ej = items[G.i];
+    var tt = function (x) { return Math.floor(x / 60) + ':' + ('0' + x % 60).slice(-2); };
+    el.innerHTML = arriba + '<h1>' + esc(ej.ejercicio) + '</h1><div class="sub">' + esc(ej.clave || '') + '</div><div class="reloj" id="g-reloj">' +
+      tt(Math.max(0, Math.round((G.fin - Date.now()) / 1000))) + '</div><div class="objetivo">Serie ' + (G.s + 1) + ' de ' + seriesDe(ej) + '</div>' +
+      '<button id="g-listo">Terminé</button>';
+    $('#g-listo').onclick = function () { serieHecha(); };
+    gReloj = setInterval(function () {
+      var r = Math.max(0, Math.round((G.fin - Date.now()) / 1000));
+      var c = $('#g-reloj'); if (c) c.textContent = tt(r);
+      if (r <= 0) { pitido(); serieHecha(); }
+    }, 250);
+  } else if (G.fase === 'descanso') {
+    var e = items[G.i], rest = Math.max(0, Math.round((G.fin - Date.now()) / 1000));
+    var t = function (x) { return Math.floor(x / 60) + ':' + ('0' + x % 60).slice(-2); };
+    el.innerHTML = arriba + '<div class="sub" style="text-align:center;margin-top:24px">Descansa</div><div class="reloj" id="g-reloj">' + t(rest) + '</div>' +
+      '<div class="objetivo">Sigue: <b>' + esc(e.ejercicio) + '</b>, serie ' + (G.s + 1) + ' de ' + seriesDe(e) + '</div>' +
+      '<div class="dos" style="margin-top:20px"><button class="sec" id="g-mas">+15 s</button><button id="g-listo">Listo, sigo</button></div>';
+    $('#g-mas').onclick = function () { G.fin += 15000; guardarGuia(); };
+    $('#g-listo').onclick = function () { G.fase = 'serie'; pintarGuia(); };
+    gReloj = setInterval(function () {
+      var r = Math.max(0, Math.round((G.fin - Date.now()) / 1000));
+      var c = $('#g-reloj'); if (c) c.textContent = t(r);
+      if (r <= 0) { pitido(); G.fase = 'serie'; pintarGuia(); }
+    }, 250);
+  } else {
+    var x = items[G.i], res = G.res[G.i], ns = seriesDe(x), fuerza = x.tipo === 'fuerza';
+    el.innerHTML = arriba + '<h1>' + esc(x.ejercicio) + '</h1>' + (x.clave ? '<div class="sub">' + esc(x.clave) + '</div>' : '') +
+      (x.notaPeso ? '<div class="sub">' + esc(x.notaPeso) + '</div>' : '') +
+      '<div class="grande">Serie ' + (G.s + 1) + '<span class="sub" style="font-size:28px"> de ' + ns + '</span></div>' +
+      '<div class="objetivo">' + esc(x.reps) + (/\d$/.test(String(x.reps)) ? ' reps' : '') + (x.peso ? ' · ' + esc(x.peso) + ' lb' : '') + '</div>' +
+      (fuerza ? '<div class="fila"><input type="number" inputmode="decimal" id="g-peso" placeholder="lb" value="' + esc(res.peso) + '">' +
+        '<input type="number" inputmode="numeric" id="g-reps" placeholder="reps que hiciste"></div>' : '') +
+      '<button id="g-hecha">Serie hecha</button><button class="sec" id="g-saltar">Saltar este ejercicio</button>';
+    var tiempo = tiempoDe(x);
+    if (tiempo && !fuerza) {
+      $('#g-hecha').textContent = 'Iniciar ' + Math.floor(tiempo / 60) + ':' + ('0' + tiempo % 60).slice(-2);
+      $('#g-hecha').onclick = function () { G.fase = 'trabajo'; G.fin = Date.now() + tiempo * 1000; pintarGuia(); };
+    } else $('#g-hecha').onclick = function () {
+      if (fuerza) {
+        var reps = $('#g-reps').value.trim();
+        if (!reps) { alert('Anota cuántas reps hiciste: con eso Ignacio sube tu peso.'); return; }
+        res.peso = $('#g-peso').value.trim(); res.reps.push(reps);
+      }
+      serieHecha();
+    };
+    $('#g-saltar').onclick = function () { G.i++; G.s = 0; if (G.i >= G.n) G.fase = 'final'; pintarGuia(); };
+  }
+  $('#g-salir').onclick = function () { guardarGuia(); cerrarGuia(); };
+}
+
 function enlazar() {
+  document.querySelectorAll('.toque').forEach(function (t) {
+    t.onclick = function () { var c = $('#card-' + t.dataset.ir); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  });
+  var bg = $('#b-empezar');
+  if (bg) bg.onclick = empezarGuia;
   document.querySelectorAll('.ej input[data-k="hecho"]').forEach(function (c) {
     c.onchange = function () { c.closest('.ej').classList.toggle('hecho', c.checked); };
   });
