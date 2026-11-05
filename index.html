@@ -321,7 +321,7 @@ function sesionHtml(h) {
       '<div><span class="chip">' + esc(e.series) + ' × ' + esc(e.reps) + '</span>' + (e.peso ? '<span class="chip peso">' + esc(e.peso) + ' lb</span>' : '') + '</div>' +
       (e.clave ? '<div class="clave">' + esc(e.clave) + '</div>' : '') +
       (e.notaPeso ? '<div class="clave">' + esc(e.notaPeso) + '</div>' : '') +
-      (e.video ? '<div><a class="vid" href="' + esc(e.video) + '" target="_blank" rel="noopener">Ver cómo se hace</a></div>' : '');
+      (e.video ? '<div style="grid-column:2"><a class="vid" href="' + esc(e.video) + '" target="_blank" rel="noopener">Ver cómo se hace</a></div>' : '');
     if (e.tipo === 'fuerza') {
       out += '<div class="fila"><input class="corto" type="number" inputmode="decimal" placeholder="lb" data-k="peso" value="' + esc(p.peso || '') + '">' +
         '<input style="flex:1;width:auto" type="text" inputmode="numeric" placeholder="reps por serie: 8 8 7" data-k="reps" value="' + esc(p.reps || '') + '"></div>';
